@@ -1,0 +1,6 @@
+@WebApi_Prasanna_HostAddress = http://localhost:5085
+
+GET {{WebApi_Prasanna_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
