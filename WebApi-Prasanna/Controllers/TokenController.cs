@@ -4,7 +4,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
 
-namespace YourNamespace.Controllers
+namespace WebApi_Prasanna.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
@@ -27,8 +27,8 @@ namespace YourNamespace.Controllers
             };
 
             var token = new JwtSecurityToken(
-                issuer: "your-app",
-                audience: "your-app",
+                issuer: "WebApi-Prasanna",
+                audience: "WebApi-Prasanna",
                 claims: claims,
                 expires: DateTime.UtcNow.AddHours(1),
                 signingCredentials: creds
@@ -42,5 +42,51 @@ namespace YourNamespace.Controllers
                 expires = token.ValidTo
             });
         }
+
+        [HttpGet("validate")]
+        public IActionResult ValidateToken(string token)
+        {
+            try
+            {
+                var secretKey = "ThisIsMySuperLongSecureKeyForJWTToken123!"; // SAME KEY
+
+                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+                var tokenHandler = new JwtSecurityTokenHandler();
+
+                // VALIDATION SETTINGS
+                var validationParams = new TokenValidationParameters
+                {
+                    ValidateIssuer = true,
+                    ValidateAudience = true,
+                    ValidateLifetime = true,
+                    ValidateIssuerSigningKey = true,
+
+                    ValidIssuer = "WebApi-Prasanna",
+                    ValidAudience = "WebApi-Prasanna",
+                    IssuerSigningKey = key,
+                    ClockSkew = TimeSpan.Zero  // no extra time allowed
+                };
+
+                // VALIDATE
+                var principal = tokenHandler.ValidateToken(token, validationParams, out SecurityToken validatedToken);
+
+                // If validation works, return success + claims
+                return Ok(new
+                {
+                    message = "Token is valid",
+                    username = principal.Identity?.Name,
+                    role = principal.FindFirst(ClaimTypes.Role)?.Value
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new
+                {
+                    message = "Invalid token",
+                    error = ex.Message
+                });
+            }
+        }
     }
 }
+
