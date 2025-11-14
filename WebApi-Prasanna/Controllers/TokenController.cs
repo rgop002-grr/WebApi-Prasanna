@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -10,25 +11,29 @@ namespace WebApi_Prasanna.Controllers
     [ApiController]
     public class TokenController : ControllerBase
     {
+        // Use same values as in Program.cs
+        private const string SecretKey = "ThisIsMySuperLongSecureKeyForJWTToken123!";
+        private const string Issuer = "WebApi-Prasanna";
+        private const string Audience = "WebApi-Prasanna";
+
+        [AllowAnonymous]
         [HttpGet("generate")]
         public IActionResult GenerateToken(string username, string role)
         {
-            // Hardcoded secret key (NO appsettings.json)
-            var secretKey = "ThisIsMySuperLongSecureKeyForJWTToken123!";
+            if (string.IsNullOrWhiteSpace(username)) return BadRequest("username required");
 
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(SecretKey));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            // Claims added into token
             var claims = new[]
             {
                 new Claim(ClaimTypes.Name, username),
-                new Claim(ClaimTypes.Role, role)
+                new Claim(ClaimTypes.Role, role ?? "User")
             };
 
             var token = new JwtSecurityToken(
-                issuer: "WebApi-Prasanna",
-                audience: "WebApi-Prasanna",
+                issuer: Issuer,
+                audience: Audience,
                 claims: claims,
                 expires: DateTime.UtcNow.AddHours(1),
                 signingCredentials: creds
@@ -36,57 +41,34 @@ namespace WebApi_Prasanna.Controllers
 
             var jwt = new JwtSecurityTokenHandler().WriteToken(token);
 
+            return Ok(new { token = jwt, expires = token.ValidTo });
+        }
+
+
+        // Protected endpoint — requires a valid JWT in Authorization header
+        [Authorize]
+        [HttpGet("protected")]
+        public IActionResult ProtectedEndpoint()
+        {
+            // You can read claims from HttpContext.User
+            var username = User.Identity?.Name;
+            var role = User.FindFirst(ClaimTypes.Role)?.Value;
+
             return Ok(new
             {
-                token = jwt,
-                expires = token.ValidTo
+                message = "You reached a protected endpoint",
+                username,
+                role,
+                claims = User.Claims.Select(c => new { c.Type, c.Value })
             });
         }
 
-        [HttpGet("validate")]
-        public IActionResult ValidateToken(string token)
-        {
-            try
-            {
-                var secretKey = "ThisIsMySuperLongSecureKeyForJWTToken123!"; // SAME KEY
-
-                var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secretKey));
-                var tokenHandler = new JwtSecurityTokenHandler();
-
-                // VALIDATION SETTINGS
-                var validationParams = new TokenValidationParameters
-                {
-                    ValidateIssuer = true,
-                    ValidateAudience = true,
-                    ValidateLifetime = true,
-                    ValidateIssuerSigningKey = true,
-
-                    ValidIssuer = "WebApi-Prasanna",
-                    ValidAudience = "WebApi-Prasanna",
-                    IssuerSigningKey = key,
-                    ClockSkew = TimeSpan.Zero  // no extra time allowed
-                };
-
-                // VALIDATE
-                var principal = tokenHandler.ValidateToken(token, validationParams, out SecurityToken validatedToken);
-
-                // If validation works, return success + claims
-                return Ok(new
-                {
-                    message = "Token is valid",
-                    username = principal.Identity?.Name,
-                    role = principal.FindFirst(ClaimTypes.Role)?.Value
-                });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new
-                {
-                    message = "Invalid token",
-                    error = ex.Message
-                });
-            }
-        }
+        //// Example: role-restricted endpoint
+        //[Authorize(Roles = "Admin")]
+        //[HttpGet("admin-only")]
+        //public IActionResult AdminOnly()
+        //{
+        //    return Ok(new { message = "Hello Admin!" });
+        //}
     }
 }
-
