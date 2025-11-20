@@ -63,12 +63,6 @@ namespace WebApi_Prasanna.Controllers
             });
         }
 
-        //// Example: role-restricted endpoint
-        //[Authorize(Roles = "Admin")]
-        //[HttpGet("admin-only")]
-        //public IActionResult AdminOnly()
-        //{
-        //    return Ok(new { message = "Hello Admin!" });
-        //}
+        
     }
 }
